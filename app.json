@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "plana_app",
-    "slug": "plana_app",
+    "name": "Plana",
+    "slug": "plana",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "planaapp",
+    "scheme": "plana",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {

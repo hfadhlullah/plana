@@ -2,6 +2,8 @@
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
+If you want to try the app, you can download the APK from the [releases](https://github.com/huseinf/plana/releases) page.
+
 ## Get started
 
 1. Install dependencies
