@@ -49,7 +49,7 @@ if (Platform.OS === 'web') {
   adapter = new SQLiteAdapter({
     schema: mySchema,
     migrations,
-    dbName: 'slotify_db',
+    dbName: 'plana_db',
     jsi: true,
     onSetUpError: error => {
       console.error('Database setup failed', error);

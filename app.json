@@ -1,17 +1,18 @@
 {
   "expo": {
-    "name": "slotify_app",
-    "slug": "slotify_app",
+    "name": "plana_app",
+    "slug": "plana_app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "slotifyapp",
+    "scheme": "planaapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
     },
     "android": {
+      "package": "com.plana.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

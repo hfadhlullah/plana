@@ -1,5 +1,5 @@
 /**
- * Slotify Design System - Color Tokens
+ * Plana Design System - Color Tokens
  * "Vintage Paper" aesthetic
  */
 export const Colors = {

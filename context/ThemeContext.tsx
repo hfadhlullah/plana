@@ -12,7 +12,7 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-const THEME_STORAGE_KEY = 'slotify_theme_preference';
+const THEME_STORAGE_KEY = 'plana_theme_preference';
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const deviceColorScheme = useDeviceColorScheme();

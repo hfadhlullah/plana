@@ -20,7 +20,7 @@ if (Platform.OS === 'web') {
   // For iOS/Android, we use SQLite
   adapter = new SQLiteAdapter({
     schema: mySchema,
-    dbName: 'slotify_db',
+    dbName: 'plana_db',
     jsi: true,
     onSetUpError: error => {
       console.error('Database setup failed', error);
