@@ -109,24 +109,11 @@ export default function UserMenuModal({ visible, onClose }: Props) {
                     <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
                     <View style={styles.menuItems}>
-                        <TouchableOpacity
-                            style={styles.menuItem}
-                            onPress={() => {
-                                // In a real app, you might navigate to a profile screen
-                                onClose();
-                            }}
-                        >
-                            <View style={[styles.iconBox, { backgroundColor: colors.muted }]}>
-                                <Icon icon="mdi:account-outline" width={20} color={colors.foreground} />
-                            </View>
-                            <Text style={[styles.menuItemLabel, { color: colors.foreground }]}>Manage account</Text>
-                        </TouchableOpacity>
-
                         <TouchableOpacity style={styles.menuItem} onPress={handleSignOut}>
-                            <View style={[styles.iconBox, { backgroundColor: colors.destructive + '15' }]}>
-                                <Icon icon="mdi:logout" width={20} color={colors.destructive} />
+                            <View style={[styles.iconBox, { backgroundColor: colors.primary + '15' }]}>
+                                <Icon icon="mdi:logout" width={20} color={colors.primary} />
                             </View>
-                            <Text style={[styles.menuItemLabel, { color: colors.destructive }]}>Sign out</Text>
+                            <Text style={[styles.menuItemLabel, { color: colors.primary }]}>Sign out</Text>
                         </TouchableOpacity>
                     </View>
                 </Animated.View>

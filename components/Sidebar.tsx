@@ -88,7 +88,9 @@ export default function Sidebar({ visible, onClose }: Props) {
                     ]}
                 >
                     <View style={[styles.header, { borderBottomColor: colors.border }]}>
-                        <Text style={[styles.headerTitle, { color: colors.foreground }]}>Slotify</Text>
+                        <Text style={[styles.headerTitle, { color: colors.foreground }]}>
+                            {process.env.EXPO_PUBLIC_APP_NAME || 'Plana'}
+                        </Text>
                         <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
                             {isWeb ? (
                                 <Icon icon="mdi:close" width={22} color={colors.mutedForeground} />

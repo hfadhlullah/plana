@@ -39,13 +39,13 @@ function InitialLayout() {
     const inAuthGroup = segments[0] === '(auth)';
     const inOnboardingGroup = segments[0] === '(onboarding)';
 
-    if (isSignedIn) {
-      if (inAuthGroup || inOnboardingGroup) {
-        router.replace('/(tabs)');
-      }
-    } else if (!hasOnboarded) {
+    if (!hasOnboarded) {
       if (!inOnboardingGroup) {
         router.replace('/(onboarding)');
+      }
+    } else if (isSignedIn) {
+      if (inAuthGroup || inOnboardingGroup) {
+        router.replace('/(tabs)');
       }
     } else if (!inAuthGroup) {
       router.replace('/(auth)/sign-in');

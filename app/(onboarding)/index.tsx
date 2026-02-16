@@ -1,4 +1,5 @@
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useAuth } from '@clerk/clerk-expo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import React from 'react';
@@ -48,6 +49,7 @@ const ONBOARDING_KEY = 'hasOnboarded';
 export default function OnboardingScreen() {
     const router = useRouter();
     const colors = useThemeColors();
+    const { isSignedIn } = useAuth();
     const scrollX = useSharedValue(0);
 
     const flatListRef = React.useRef<Animated.FlatList<any>>(null);
@@ -73,10 +75,18 @@ export default function OnboardingScreen() {
         } else {
             try {
                 await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
-                router.replace('/(auth)/sign-up');
+                if (isSignedIn) {
+                    router.replace('/(tabs)');
+                } else {
+                    router.replace('/(auth)/sign-up');
+                }
             } catch (e) {
                 console.error('Failed to save onboarding status', e);
-                router.replace('/(auth)/sign-up');
+                if (isSignedIn) {
+                    router.replace('/(tabs)');
+                } else {
+                    router.replace('/(auth)/sign-up');
+                }
             }
         }
     };

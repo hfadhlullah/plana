@@ -50,7 +50,9 @@ export default function SignUpScreen() {
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
             <View style={styles.header}>
-                <Text style={[styles.title, { color: colors.foreground }]}>Join Slotify</Text>
+                <Text style={[styles.title, { color: colors.foreground }]}>
+                    Join {process.env.EXPO_PUBLIC_APP_NAME || 'Plana'}
+                </Text>
                 <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
                     Create an account to start your journey.
                 </Text>
