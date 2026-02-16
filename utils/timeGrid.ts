@@ -44,9 +44,7 @@ export function minutesToY(minutes: number): number {
 export function minutesToTimeString(minutes: number): string {
   const hrs = Math.floor(minutes / 60);
   const mins = minutes % 60;
-  const period = hrs >= 12 ? 'PM' : 'AM';
-  const displayHrs = hrs === 0 ? 12 : hrs > 12 ? hrs - 12 : hrs;
-  return `${displayHrs}:${mins.toString().padStart(2, '0')} ${period}`;
+  return `${hrs.toString().padStart(2, '0')}.${mins.toString().padStart(2, '0')}`;
 }
 
 /**

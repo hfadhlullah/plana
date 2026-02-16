@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
   Platform,
   ScrollView,
   StyleSheet,
@@ -84,6 +85,31 @@ export default function HomeScreen() {
   const isDragging = useRef(false);
   const isResizing = useRef(false);
   const activeAct = useRef<Activity | null>(null);
+
+  const [isSpeedDialOpen, setIsSpeedDialOpen] = useState(false);
+  const [speedDialAnim] = useState(new Animated.Value(0));
+  const [initialTypeForModal, setInitialTypeForModal] = useState<ActivityType | null>(null);
+
+  const toggleSpeedDial = (open?: boolean) => {
+    const toValue = open ?? !isSpeedDialOpen;
+    setIsSpeedDialOpen(toValue);
+    Animated.spring(speedDialAnim, {
+      toValue: toValue ? 1 : 0,
+      tension: 60,
+      friction: 8,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleSpeedDialAction = (type: ActivityType | 'backlog') => {
+    toggleSpeedDial(false);
+    if (type === 'backlog') {
+      setShowBacklogModal(true);
+    } else {
+      setInitialTypeForModal(type);
+      setShowModal(true);
+    }
+  };
 
   const now = new Date();
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
@@ -291,14 +317,91 @@ export default function HomeScreen() {
         </View>
       </ScrollView>
 
-      {/* ── Floating FAB (bottom-right) ── */}
-      <TouchableOpacity
-        onPress={() => setShowModal(true)}
-        style={[styles.floatingFab, { backgroundColor: colors.primary }]}
-        activeOpacity={0.8}
-      >
-        {isWeb ? <Icon icon="mdi:plus" width={26} color="#fff" /> : <Text style={{ color: '#fff', fontSize: 26 }}>+</Text>}
-      </TouchableOpacity>
+      {/* ── Speed Dial FAB ── */}
+      <View style={styles.speedDialContainer}>
+        {isSpeedDialOpen && (
+          <Animated.View
+            style={[
+              styles.speedDialBackdrop,
+              {
+                opacity: speedDialAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, 1],
+                }),
+              }
+            ]}
+          >
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={() => toggleSpeedDial(false)}
+              style={styles.flex1}
+            />
+          </Animated.View>
+        )}
+
+        <View style={styles.speedDialColumn}>
+          {[
+            { label: 'Task', icon: 'mdi:checkbox-marked-circle-outline', color: '#A67C52', type: 'task' as const },
+            { label: 'Event', icon: 'mdi:calendar-star', color: '#5B8DEF', type: 'event' as const },
+            { label: 'Habit', icon: 'mdi:refresh-circle', color: '#43A680', type: 'habit' as const },
+            { label: 'Activities', icon: 'mdi:format-list-bulleted', color: colors.foreground, type: 'backlog' as const },
+          ].map((item, i, arr) => {
+            const translateY = speedDialAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [20 * (arr.length - i), 0],
+            });
+            const opacity = speedDialAnim.interpolate({
+              inputRange: [0, 0.5, 1],
+              outputRange: [0, 0, 1],
+            });
+            const scale = speedDialAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0.3, 1],
+            });
+
+            return (
+              <Animated.View
+                key={item.label}
+                pointerEvents={isSpeedDialOpen ? 'auto' : 'none'}
+                style={[
+                  styles.speedItemRow,
+                  {
+                    opacity,
+                    transform: [{ translateY }, { scale }],
+                  }
+                ]}
+              >
+                <View style={styles.speedLabelCard}>
+                  <Text style={[styles.speedLabelText, { color: '#fff' }]}>{item.label}</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => handleSpeedDialAction(item.type)}
+                  style={[styles.speedItemBtn, { backgroundColor: item.color === colors.foreground ? colors.card : item.color, borderColor: colors.border }]}
+                >
+                  <Icon icon={item.icon} width={20} color={item.color === colors.foreground ? colors.foreground : '#fff'} />
+                </TouchableOpacity>
+              </Animated.View>
+            );
+          })}
+
+          <TouchableOpacity
+            onPress={() => toggleSpeedDial()}
+            style={[styles.floatingFab, { backgroundColor: colors.primary, marginBottom: 0 }]}
+            activeOpacity={0.9}
+          >
+            <Animated.View style={{
+              transform: [{
+                rotate: speedDialAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['0deg', '45deg']
+                })
+              }]
+            }}>
+              <Icon icon="mdi:plus" width={26} color="#fff" />
+            </Animated.View>
+          </TouchableOpacity>
+        </View>
+      </View>
 
       {/* ── Floating hint banners ── */}
       {selectedActivity && (
@@ -321,27 +424,13 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* ── Floating backlog button (bottom-left) ── */}
-      <TouchableOpacity
-        onPress={() => setShowBacklogModal(true)}
-        style={[styles.floatingBacklog, { backgroundColor: colors.card, borderColor: colors.border }]}
-        activeOpacity={0.8}
-      >
-        <View style={styles.backlogBtnContent}>
-          {isWeb ? (
-            <Icon icon="mdi:format-list-bulleted" width={22} color={colors.foreground} />
-          ) : (
-            <Text style={{ fontSize: 20 }}></Text>
-          )}
-          {backlog.length > 0 && (
-            <View style={[styles.backlogBadge, { backgroundColor: colors.primary }]}>
-              <Text style={styles.backlogBadgeText}>{backlog.length}</Text>
-            </View>
-          )}
-        </View>
-      </TouchableOpacity>
-
-      <CreateActivityModal visible={showModal} onClose={() => setShowModal(false)} onSubmit={handleCreate} />
+      {/* ── Create Activity Modal ── */}
+      <CreateActivityModal
+        visible={showModal}
+        onClose={() => setShowModal(false)}
+        onSubmit={handleCreate}
+        initialType={initialTypeForModal}
+      />
       <BacklogModal
         visible={showBacklogModal}
         onClose={() => setShowBacklogModal(false)}
@@ -401,11 +490,87 @@ const styles = StyleSheet.create({
 
   // Floating elements
   floatingFab: {
-    position: 'absolute', bottom: 20, right: 20,
-    width: 60, height: 60, borderRadius: 30, // Slightly larger for "very bottom right" prominence
-    alignItems: 'center', justifyContent: 'center',
-    zIndex: 35,
-    shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6, elevation: 6,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+    marginBottom: 20,
+  },
+  speedDialContainer: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    left: 0,
+    top: 0,
+    alignItems: 'flex-end',
+    justifyContent: 'flex-end',
+    pointerEvents: 'box-none',
+    zIndex: 100,
+  },
+  speedDialBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+  },
+  flex1: { flex: 1 },
+  speedDialColumn: {
+    alignItems: 'flex-end',
+    paddingRight: 20,
+    paddingBottom: 20,
+    gap: 12,
+  },
+  speedItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  speedItemBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+    borderWidth: 1,
+  },
+  speedLabelCard: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  speedLabelText: {
+    fontSize: 14,
+    fontWeight: '800',
+    textShadowColor: 'rgba(0, 0, 0, 0.1)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  floatingHint: {
+    position: 'absolute',
+    bottom: 24,
+    left: 20,
+    right: 90,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
+    zIndex: 50,
   },
   header: {
     flexDirection: 'row',
@@ -434,41 +599,4 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   headerDateText: { fontSize: 13, fontWeight: '700' },
-  floatingHint: {
-    position: 'absolute', top: 8, left: 80, right: 80,
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 12, paddingVertical: 8,
-    borderRadius: 20, borderWidth: 1,
-    zIndex: 30,
-  },
-
-  // Floating backlog button
-  floatingBacklog: {
-    position: 'absolute', bottom: 95, right: 20,
-    width: 60, height: 60, borderRadius: 30,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1,
-    zIndex: 35,
-    shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 6,
-  },
-  backlogBtnContent: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backlogBadge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 6,
-  },
-  backlogBadgeText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '700',
-  },
 });

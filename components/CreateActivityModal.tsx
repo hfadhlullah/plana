@@ -35,17 +35,29 @@ interface Props {
     visible: boolean;
     onClose: () => void;
     onSubmit: (title: string, type: ActivityType, duration: number, color: string | null, startTime: Date | null) => void;
+    initialType?: ActivityType | null;
 }
 
-export default function CreateActivityModal({ visible, onClose, onSubmit }: Props) {
+export default function CreateActivityModal({ visible, onClose, onSubmit, initialType }: Props) {
     const colors = useThemeColors();
     const [title, setTitle] = useState('');
-    const [type, setType] = useState<ActivityType>('task');
+    const [type, setType] = useState<ActivityType>(initialType || 'task');
     const [duration, setDuration] = useState(30);
     const [customColor, setCustomColor] = useState<string | null>(null);
     const [isScheduled, setIsScheduled] = useState(false);
     const [scheduledDate, setScheduledDate] = useState(new Date());
     const [showDatePicker, setShowDatePicker] = useState(false);
+
+    React.useEffect(() => {
+        if (visible) {
+            setTitle('');
+            setType(initialType || 'task');
+            setDuration(30);
+            setCustomColor(null);
+            setIsScheduled(false);
+            setScheduledDate(new Date());
+        }
+    }, [visible, initialType]);
 
     const handleSubmit = () => {
         if (!title.trim()) return;
