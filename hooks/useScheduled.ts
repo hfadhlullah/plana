@@ -1,3 +1,4 @@
+import { useAuth } from '@clerk/clerk-expo';
 import { Q } from '@nozbe/watermelondb';
 import { endOfDay, startOfDay } from 'date-fns';
 import { useEffect, useState } from 'react';
@@ -10,11 +11,19 @@ import { activitiesCollection, database } from '../model/database';
 export function useScheduled(date: Date = new Date(), refreshKey: number = 0) {
   const [scheduled, setScheduled] = useState<Activity[]>([]);
 
+  const { userId } = useAuth();
+
   useEffect(() => {
+    if (!userId) {
+      setScheduled([]);
+      return;
+    }
+
     const dayStart = startOfDay(date).getTime();
     const dayEnd = endOfDay(date).getTime();
 
     const query = activitiesCollection.query(
+      Q.where('user_id', userId),
       Q.where('status', 'scheduled'),
       Q.where('start_time', Q.gte(dayStart)),
       Q.where('start_time', Q.lte(dayEnd)),

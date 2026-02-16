@@ -1,11 +1,12 @@
 import { appSchema, tableSchema } from '@nozbe/watermelondb'
 
 export const mySchema = appSchema({
-  version: 2,
+  version: 3,
   tables: [
     tableSchema({
       name: 'activities',
       columns: [
+        { name: 'user_id', type: 'string', isIndexed: true },
         { name: 'title', type: 'string' },
         { name: 'description', type: 'string', isOptional: true },
         { name: 'type', type: 'string' }, // 'task', 'event', 'habit'

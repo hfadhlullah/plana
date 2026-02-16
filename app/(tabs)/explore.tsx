@@ -1,3 +1,4 @@
+import { useAuth } from '@clerk/clerk-expo';
 import { Icon } from '@iconify/react';
 import { Q } from '@nozbe/watermelondb';
 import { addDays, format, isSameDay, startOfWeek } from 'date-fns';
@@ -81,11 +82,19 @@ export default function WeekScreen() {
     }, [])
   );
 
+  const { userId } = useAuth();
+
   useEffect(() => {
+    if (!userId) {
+      setEvents([]);
+      return;
+    }
+
     const start = weekStart.getTime();
     const end = addDays(weekStart, 6).setHours(23, 59, 59, 999); // End of the last day of the week
 
     const query = activitiesCollection.query(
+      Q.where('user_id', userId),
       Q.where('status', 'scheduled'),
       Q.where('start_time', Q.gte(start)),
       Q.where('start_time', Q.lte(end)),
@@ -93,14 +102,13 @@ export default function WeekScreen() {
 
     const sub = query.observe().subscribe(
       (activities) => {
-        console.log('Week view received update:', activities.length, 'activities');
         setEvents(activities);
       },
       (e) => console.error('Week observer error:', e)
     );
 
     return () => sub.unsubscribe();
-  }, [weekStart, refreshKey]);
+  }, [weekStart, refreshKey, userId]);
 
   const now = new Date();
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
@@ -205,49 +213,47 @@ export default function WeekScreen() {
             </View>
           ))}
 
-          {/* Event blocks per day column */}
-          {days.map((_, dayIdx) => {
-            const dayEvents = eventsByDay.get(dayIdx) || [];
-            const colLeft = GUTTER_W + (dayIdx * (100 - (GUTTER_W * 100 / (typeof window !== 'undefined' ? window.innerWidth : 400)))) / 7;
+          {/* Event blocks layer */}
+          <View style={styles.eventsLayer} pointerEvents="box-none">
+            {days.map((_, dayIdx) => (
+              <View key={dayIdx} style={styles.dayColLayer} pointerEvents="box-none">
+                {(eventsByDay.get(dayIdx) || []).map((activity) => {
+                  const startMin = getStartMin(activity);
+                  const top = minToY(startMin);
+                  const height = Math.max(minToY(activity.duration), 18);
 
-            return dayEvents.map((activity) => {
-              const startMin = getStartMin(activity);
-              const top = minToY(startMin);
-              const height = Math.max(minToY(activity.duration), 18);
+                  const defaultColor = TYPE_COLORS[activity.type] || TYPE_COLORS.task;
+                  const tc = activity.color
+                    ? { bg: activity.color, border: activity.color + 'DD' }
+                    : defaultColor;
 
-              // Use custom color if set, otherwise use type color
-              const defaultColor = TYPE_COLORS[activity.type] || TYPE_COLORS.task;
-              const tc = activity.color
-                ? { bg: activity.color, border: activity.color + 'DD' }
-                : defaultColor;
-
-              return (
-                <TouchableOpacity
-                  key={activity.id}
-                  activeOpacity={0.8}
-                  onPress={() => setDetailActivity(activity)}
-                  style={[
-                    styles.eventBlock,
-                    {
-                      top,
-                      height,
-                      backgroundColor: tc.bg,
-                      borderLeftColor: tc.border,
-                      left: `${(GUTTER_W / 3.6) + (dayIdx * (100 - GUTTER_W / 3.6)) / 7}%` as any,
-                      width: `${(100 - GUTTER_W / 3.6) / 7 - 1}%` as any,
-                    },
-                  ]}
-                >
-                  <Text style={styles.eventTitle} numberOfLines={1}>{activity.title}</Text>
-                  {height > 24 && (
-                    <Text style={styles.eventTime}>
-                      {minutesToTimeString(startMin)}
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              );
-            });
-          })}
+                  return (
+                    <TouchableOpacity
+                      key={activity.id}
+                      activeOpacity={0.8}
+                      onPress={() => setDetailActivity(activity)}
+                      style={[
+                        styles.eventBlock,
+                        {
+                          top,
+                          height,
+                          backgroundColor: tc.bg,
+                          borderLeftColor: tc.border,
+                        },
+                      ]}
+                    >
+                      <Text style={styles.eventTitle} numberOfLines={1}>{activity.title}</Text>
+                      {height > 24 && (
+                        <Text style={styles.eventTime}>
+                          {minutesToTimeString(startMin)}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ))}
+          </View>
 
           {/* Current time line */}
           {days.some((d) => isSameDay(d, now)) && (
@@ -329,8 +335,22 @@ const styles = StyleSheet.create({
   columnsRow: { flex: 1, flexDirection: 'row', borderTopWidth: 1 },
   dayColumn: { flex: 1 },
 
+  eventsLayer: {
+    position: 'absolute',
+    top: 0,
+    left: GUTTER_W,
+    right: 0,
+    bottom: 0,
+    flexDirection: 'row',
+  },
+  dayColLayer: {
+    flex: 1,
+    position: 'relative',
+  },
   eventBlock: {
     position: 'absolute',
+    left: 1,
+    right: 1,
     borderRadius: 4,
     borderLeftWidth: 3,
     paddingHorizontal: 4,

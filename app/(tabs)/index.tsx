@@ -1,9 +1,11 @@
+import { useUser } from '@clerk/clerk-expo';
 import { Icon } from '@iconify/react';
 import { format } from 'date-fns';
 import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
+  Image,
   Platform,
   ScrollView,
   StyleSheet,
@@ -18,6 +20,7 @@ import BacklogModal from '@/components/BacklogModal';
 import CreateActivityModal from '@/components/CreateActivityModal';
 import EditActivityModal from '@/components/EditActivityModal';
 import Sidebar from '@/components/Sidebar';
+import UserMenuModal from '@/components/UserMenuModal';
 import { useBacklog } from '@/hooks/useBacklog';
 import { useScheduled } from '@/hooks/useScheduled';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -60,6 +63,7 @@ export default function HomeScreen() {
     }, [])
   );
 
+  const { user } = useUser();
   const { scheduled, scheduleActivity, rescheduleActivity, unscheduleActivity } = useScheduled(today, refreshKey);
   const { backlog } = useBacklog();
   const colors = useThemeColors();
@@ -72,6 +76,7 @@ export default function HomeScreen() {
   const [detailActivity, setDetailActivity] = useState<Activity | null>(null);
   const [editActivity, setEditActivity] = useState<Activity | null>(null);
   const [showSidebar, setShowSidebar] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
 
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOffsetY, setDragOffsetY] = useState(0);
@@ -174,9 +179,11 @@ export default function HomeScreen() {
   }, [selectedActivity, scheduleActivity, today]);
 
   const handleCreate = useCallback((title: string, type: ActivityType, duration: number, color: string | null, startTime: Date | null) => {
+    if (!user) return;
     const { database: db, activitiesCollection } = require('@/model/database');
     db.write(async () => {
       await activitiesCollection.create((a: any) => {
+        a.userId = user.id;
         a.title = title;
         a.type = type;
         a.status = startTime ? 'scheduled' : 'backlog';
@@ -187,7 +194,7 @@ export default function HomeScreen() {
         a.color = color;
       });
     });
-  }, []);
+  }, [user]);
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
@@ -207,6 +214,22 @@ export default function HomeScreen() {
               {format(today, 'EEE, MMM d')}
             </Text>
           </View>
+        </View>
+
+        <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={styles.avatarContainer}
+            onPress={() => setShowUserMenu(true)}
+            activeOpacity={0.7}
+          >
+            {user?.imageUrl ? (
+              <Image source={{ uri: user.imageUrl }} style={styles.avatarImage} />
+            ) : (
+              <View style={[styles.avatarFallback, { backgroundColor: colors.primary }]}>
+                <Text style={styles.avatarText}>{user?.firstName?.[0] || 'U'}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -401,28 +424,32 @@ export default function HomeScreen() {
             </Animated.View>
           </TouchableOpacity>
         </View>
-      </View>
 
-      {/* ── Floating hint banners ── */}
-      {selectedActivity && (
-        <View style={[styles.floatingHint, { backgroundColor: colors.card + 'F0', borderColor: colors.primary + '40' }]}>
-          {isWeb && <Icon icon="mdi:gesture-tap" width={16} color={colors.primary} />}
-          <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '600', flex: 1 }}>
-            Tap a slot for "{selectedActivity.title}"
-          </Text>
-          <TouchableOpacity onPress={() => setSelectedActivity(null)}>
-            <Text style={{ color: colors.destructive, fontSize: 12, fontWeight: '700' }}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-      {(dragId || resizeId) && (
-        <View style={[styles.floatingHint, { backgroundColor: colors.card + 'F0', borderColor: '#5B8DEF40' }]}>
-          {isWeb && <Icon icon={resizeId ? 'mdi:arrow-expand-vertical' : 'mdi:cursor-move'} width={16} color="#5B8DEF" />}
-          <Text style={{ color: '#5B8DEF', fontSize: 12, fontWeight: '600' }}>
-            {resizeId ? 'Resize • Release to confirm' : 'Move • Release to confirm'}
-          </Text>
-        </View>
-      )}
+        {/* ── Floating hint banners ── */}
+        {
+          selectedActivity && (
+            <View style={[styles.floatingHint, { backgroundColor: colors.card + 'F0', borderColor: colors.primary + '40' }]}>
+              {isWeb && <Icon icon="mdi:gesture-tap" width={16} color={colors.primary} />}
+              <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '600', flex: 1 }}>
+                Tap a slot for "{selectedActivity.title}"
+              </Text>
+              <TouchableOpacity onPress={() => setSelectedActivity(null)}>
+                <Text style={{ color: colors.destructive, fontSize: 12, fontWeight: '700' }}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          )
+        }
+        {
+          (dragId || resizeId) && (
+            <View style={[styles.floatingHint, { backgroundColor: colors.card + 'F0', borderColor: '#5B8DEF40' }]}>
+              {isWeb && <Icon icon={resizeId ? 'mdi:arrow-expand-vertical' : 'mdi:cursor-move'} width={16} color="#5B8DEF" />}
+              <Text style={{ color: '#5B8DEF', fontSize: 12, fontWeight: '600' }}>
+                {resizeId ? 'Resize • Release to confirm' : 'Move • Release to confirm'}
+              </Text>
+            </View>
+          )
+        }
+      </View>
 
       {/* ── Create Activity Modal ── */}
       <CreateActivityModal
@@ -462,6 +489,7 @@ export default function HomeScreen() {
       />
 
       <Sidebar visible={showSidebar} onClose={() => setShowSidebar(false)} />
+      <UserMenuModal visible={showUserMenu} onClose={() => setShowUserMenu(false)} />
     </SafeAreaView>
   );
 }
@@ -599,4 +627,30 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   headerDateText: { fontSize: 13, fontWeight: '700' },
+  headerRight: {
+    marginLeft: 'auto',
+  },
+  avatarContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.1)',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  avatarFallback: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
 });

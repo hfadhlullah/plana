@@ -10,6 +10,18 @@ import { mySchema } from './schema';
 const migrations = schemaMigrations({
   migrations: [
     {
+      toVersion: 3,
+      steps: [
+        {
+          type: 'add_columns',
+          table: 'activities',
+          columns: [
+            { name: 'user_id', type: 'string', isIndexed: true },
+          ],
+        },
+      ],
+    },
+    {
       toVersion: 2,
       steps: [
         {

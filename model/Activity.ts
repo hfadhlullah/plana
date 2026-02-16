@@ -7,7 +7,9 @@ export type ActivityPriority = 'low' | 'medium' | 'high'
 
 export default class Activity extends Model {
   static table = 'activities'
-
+  
+  // @ts-ignore
+  @text('user_id') userId: string
   // @ts-ignore
   @text('title') title: string
   // @ts-ignore
