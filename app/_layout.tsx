@@ -9,6 +9,7 @@ import { tokenCache } from '@/utils/cache';
 import { ClerkProvider, useAuth } from '@clerk/clerk-expo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
+import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 const CLERK_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
@@ -71,7 +72,8 @@ function InitialLayout() {
 
 export default function RootLayout() {
   if (!CLERK_PUBLISHABLE_KEY) {
-    throw new Error('Missing Publishable Key. Please set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in your .env');
+    console.error('Missing Publishable Key. Please set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in your .env');
+    return <View />;
   }
 
   return (
