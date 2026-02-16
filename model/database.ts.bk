@@ -1,0 +1,38 @@
+import { Database } from '@nozbe/watermelondb';
+import Context from '@nozbe/watermelondb/adapters/lokijs';
+import SQLiteAdapter from '@nozbe/watermelondb/adapters/sqlite';
+import { Platform } from 'react-native';
+
+import Activity from './Activity';
+import { mySchema } from './schema';
+
+let adapter;
+
+if (Platform.OS === 'web') {
+  // For web (or static rendering), we use LokiJS to prevent SQLite crashes
+  adapter = new Context({
+    schema: mySchema,
+    // migrations,
+    useWebWorker: false,
+    useIncrementalIndexedDB: true,
+  });
+} else {
+  // For iOS/Android, we use SQLite
+  adapter = new SQLiteAdapter({
+    schema: mySchema,
+    dbName: 'slotify_db',
+    jsi: true,
+    onSetUpError: error => {
+      console.error('Database setup failed', error);
+    }
+  });
+}
+
+export const database = new Database({
+  adapter,
+  modelClasses: [
+    Activity,
+  ],
+});
+
+export const activitiesCollection = database.get<Activity>('activities');

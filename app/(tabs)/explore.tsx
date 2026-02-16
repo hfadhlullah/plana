@@ -1,112 +1,378 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { Icon } from '@iconify/react';
+import { Q } from '@nozbe/watermelondb';
+import { addDays, format, isSameDay, startOfWeek } from 'date-fns';
+import { useFocusEffect } from 'expo-router';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Collapsible } from '@/components/ui/collapsible';
-import { ExternalLink } from '@/components/external-link';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Fonts } from '@/constants/theme';
+import ActivityDetailModal from '@/components/ActivityDetailModal';
+import DatePickerModal from '@/components/DatePickerModal';
+import EditActivityModal from '@/components/EditActivityModal';
+import Sidebar from '@/components/Sidebar';
+import { useThemeColors } from '@/hooks/useThemeColors';
+import Activity from '@/model/Activity';
+import { activitiesCollection, database } from '@/model/database';
+import { minutesToTimeString } from '@/utils/timeGrid';
 
-export default function TabTwoScreen() {
+const HOUR_HEIGHT = 60;
+const TOTAL_HOURS = 24;
+const DAY_HEADER_H = 52;
+const GUTTER_W = 40;
+
+function formatHour(h: number) {
+  if (h === 0) return '';
+  return `${h.toString().padStart(2, '0')}.00`;
+}
+
+function getStartMin(a: Activity) {
+  if (!a.startTime) return 0;
+  const d = new Date(a.startTime);
+  return d.getHours() * 60 + d.getMinutes();
+}
+
+function minToY(min: number) {
+  return (min / 60) * HOUR_HEIGHT;
+}
+
+const TYPE_COLORS: Record<string, { bg: string; border: string }> = {
+  task: { bg: '#A67C52', border: '#8E6942' },
+  event: { bg: '#5B8DEF', border: '#4A7BD8' },
+  habit: { bg: '#43A680', border: '#378B6A' },
+};
+
+export default function WeekScreen() {
+  const colors = useThemeColors();
+  const isWeb = Platform.OS === 'web';
+
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [detailActivity, setDetailActivity] = useState<Activity | null>(null);
+  const [editActivity, setEditActivity] = useState<Activity | null>(null);
+  const [showSidebar, setShowSidebar] = useState(false);
+
+  const handleUnschedule = async (activity: Activity) => {
+    await database.write(async () => {
+      await activity.update((a: any) => {
+        a.status = 'backlog';
+        a.startTime = null;
+      });
+    });
+  };
+
+  const weekStart = useMemo(() => startOfWeek(selectedDate, { weekStartsOn: 1 }), [selectedDate]);
+  const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
+
+  const [events, setEvents] = useState<Activity[]>([]);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Force refresh when tab is focused
+  useFocusEffect(
+    useCallback(() => {
+      console.log('Week view focused, refreshing...');
+      setRefreshKey(prev => prev + 1);
+    }, [])
+  );
+
+  useEffect(() => {
+    const start = weekStart.getTime();
+    const end = addDays(weekStart, 6).setHours(23, 59, 59, 999); // End of the last day of the week
+
+    const query = activitiesCollection.query(
+      Q.where('status', 'scheduled'),
+      Q.where('start_time', Q.gte(start)),
+      Q.where('start_time', Q.lte(end)),
+    );
+
+    const sub = query.observe().subscribe(
+      (activities) => {
+        console.log('Week view received update:', activities.length, 'activities');
+        setEvents(activities);
+      },
+      (e) => console.error('Week observer error:', e)
+    );
+
+    return () => sub.unsubscribe();
+  }, [weekStart, refreshKey]);
+
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const currentTimeTop = minToY(currentMinutes);
+
+  const scrollRef = useRef<ScrollView>(null);
+  useEffect(() => {
+    setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: Math.max(0, currentTimeTop - 150), animated: true });
+    }, 400);
+  }, []);
+
+  const eventsByDay = useMemo(() => {
+    const map = new Map<number, Activity[]>();
+    events.forEach((ev) => {
+      if (!ev.startTime) return;
+      const evDate = new Date(ev.startTime);
+      const dayIdx = days.findIndex((d) => isSameDay(d, evDate));
+      if (dayIdx >= 0) {
+        const list = map.get(dayIdx) || [];
+        list.push(ev);
+        map.set(dayIdx, list);
+      }
+    });
+    return map;
+  }, [events, days]);
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText
-          type="title"
-          style={{
-            fontFamily: Fonts.rounded,
-          }}>
-          Explore
-        </ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image
-          source={require('@/assets/images/react-logo.png')}
-          style={{ width: 100, height: 100, alignSelf: 'center' }}
-        />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful{' '}
-          <ThemedText type="defaultSemiBold" style={{ fontFamily: Fonts.mono }}>
-            react-native-reanimated
-          </ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
+    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
+      {/* ── Top Header ── */}
+      <View style={[styles.header, { backgroundColor: colors.card }]}>
+        <View style={styles.headerLeft}>
+          <TouchableOpacity
+            onPress={() => setShowSidebar(true)}
+            style={[styles.menuBtn, { backgroundColor: colors.background }]}
+            activeOpacity={0.8}
+          >
+            {isWeb ? <Icon icon="mdi:menu" width={22} color={colors.foreground} /> : <Text style={{ fontSize: 20 }}>☰</Text>}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => setShowDatePicker(true)}
+            style={[styles.headerDate, { backgroundColor: colors.background }]}
+            activeOpacity={0.8}
+          >
+            {isWeb && <Icon icon="mdi:calendar-month" width={16} color={colors.primary} />}
+            <Text style={[styles.headerDateText, { color: colors.foreground }]}>
+              {format(weekStart, 'MMM d')} – {format(addDays(weekStart, 6), 'MMM d')}
+            </Text>
+            {isWeb && <Icon icon="mdi:chevron-down" width={16} color={colors.mutedForeground} />}
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* ── Day headers (sticky) ── */}
+      <View style={[styles.dayHeaderRow, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        <View style={{ width: GUTTER_W }} />
+        {days.map((day, i) => {
+          const isToday = isSameDay(day, now);
+          return (
+            <View key={i} style={styles.dayHeaderCell}>
+              <Text style={[styles.dayName, { color: isToday ? colors.primary : colors.mutedForeground }]}>
+                {format(day, 'EEE')}
+              </Text>
+              <View style={[styles.dayNumber, isToday && { backgroundColor: colors.primary }]}>
+                <Text style={[styles.dayNumberText, { color: isToday ? '#fff' : colors.foreground }]}>
+                  {format(day, 'd')}
+                </Text>
+              </View>
+            </View>
+          );
         })}
-      </Collapsible>
-    </ParallaxScrollView>
+      </View>
+
+      {/* ── Calendar grid ── */}
+      <ScrollView
+        ref={scrollRef}
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingHorizontal: 8, paddingBottom: 60 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.gridWrap}>
+          {/* Hour rows */}
+          {Array.from({ length: TOTAL_HOURS }, (_, hour) => (
+            <View key={hour} style={styles.hourRow}>
+              <View style={styles.gutter}>
+                <Text style={[styles.gutterText, { color: colors.mutedForeground }]}>
+                  {formatHour(hour)}
+                </Text>
+              </View>
+              <View style={[styles.columnsRow, { borderTopColor: colors.border }]}>
+                {days.map((_, di) => (
+                  <View
+                    key={di}
+                    style={[
+                      styles.dayColumn,
+                      di < 6 && { borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.border + '40' },
+                    ]}
+                  />
+                ))}
+              </View>
+            </View>
+          ))}
+
+          {/* Event blocks per day column */}
+          {days.map((_, dayIdx) => {
+            const dayEvents = eventsByDay.get(dayIdx) || [];
+            const colLeft = GUTTER_W + (dayIdx * (100 - (GUTTER_W * 100 / (typeof window !== 'undefined' ? window.innerWidth : 400)))) / 7;
+
+            return dayEvents.map((activity) => {
+              const startMin = getStartMin(activity);
+              const top = minToY(startMin);
+              const height = Math.max(minToY(activity.duration), 18);
+
+              // Use custom color if set, otherwise use type color
+              const defaultColor = TYPE_COLORS[activity.type] || TYPE_COLORS.task;
+              const tc = activity.color
+                ? { bg: activity.color, border: activity.color + 'DD' }
+                : defaultColor;
+
+              return (
+                <TouchableOpacity
+                  key={activity.id}
+                  activeOpacity={0.8}
+                  onPress={() => setDetailActivity(activity)}
+                  style={[
+                    styles.eventBlock,
+                    {
+                      top,
+                      height,
+                      backgroundColor: tc.bg,
+                      borderLeftColor: tc.border,
+                      left: `${(GUTTER_W / 3.6) + (dayIdx * (100 - GUTTER_W / 3.6)) / 7}%` as any,
+                      width: `${(100 - GUTTER_W / 3.6) / 7 - 1}%` as any,
+                    },
+                  ]}
+                >
+                  <Text style={styles.eventTitle} numberOfLines={1}>{activity.title}</Text>
+                  {height > 24 && (
+                    <Text style={styles.eventTime}>
+                      {minutesToTimeString(startMin)}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              );
+            });
+          })}
+
+          {/* Current time line */}
+          {days.some((d) => isSameDay(d, now)) && (
+            <View style={[styles.nowLine, { top: currentTimeTop }]} pointerEvents="none">
+              <View style={[styles.nowDot, { backgroundColor: colors.destructive }]} />
+              <View style={[styles.nowBar, { backgroundColor: colors.destructive }]} />
+            </View>
+          )}
+        </View>
+      </ScrollView>
+
+      {/* ── Date Picker Modal ── */}
+
+      {/* ── Date Picker Modal ── */}
+      <DatePickerModal
+        visible={showDatePicker}
+        onClose={() => setShowDatePicker(false)}
+        selectedDate={selectedDate}
+        onSelectDate={setSelectedDate}
+        showTime={false}
+      />
+
+      {/* ── Activity Detail Modal ── */}
+      <ActivityDetailModal
+        visible={!!detailActivity}
+        onClose={() => setDetailActivity(null)}
+        activity={detailActivity}
+        onUnschedule={(act) => {
+          handleUnschedule(act);
+          setDetailActivity(null);
+        }}
+        onEdit={(act) => {
+          setEditActivity(act);
+          setDetailActivity(null);
+        }}
+      />
+
+      <EditActivityModal
+        visible={!!editActivity}
+        onClose={() => {
+          setEditActivity(null);
+          setRefreshKey(prev => prev + 1);
+        }}
+        activity={editActivity}
+      />
+      <Sidebar visible={showSidebar} onClose={() => setShowSidebar(false)} />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
-  },
-  titleContainer: {
+  safe: { flex: 1 },
+
+  dayHeaderRow: {
     flexDirection: 'row',
-    gap: 8,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    alignItems: 'center',
   },
+  dayHeaderCell: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 2,
+  },
+  dayName: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase' },
+  dayNumber: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayNumberText: { fontSize: 14, fontWeight: '600' },
+
+  gridWrap: { position: 'relative' },
+  hourRow: { flexDirection: 'row', height: HOUR_HEIGHT },
+  gutter: { width: GUTTER_W, alignItems: 'flex-end', paddingRight: 6, marginTop: -7 },
+  gutterText: { fontSize: 9, fontFamily: 'monospace' },
+  columnsRow: { flex: 1, flexDirection: 'row', borderTopWidth: 1 },
+  dayColumn: { flex: 1 },
+
+  eventBlock: {
+    position: 'absolute',
+    borderRadius: 4,
+    borderLeftWidth: 3,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    overflow: 'hidden',
+  },
+  eventTitle: { color: '#fff', fontSize: 10, fontWeight: '700' },
+  eventTime: { color: 'rgba(255,255,255,0.7)', fontSize: 8, fontFamily: 'monospace' },
+
+  nowLine: {
+    position: 'absolute', left: 0, right: 0,
+    flexDirection: 'row', alignItems: 'center', zIndex: 20,
+  },
+  nowDot: { width: 8, height: 8, borderRadius: 4, marginLeft: GUTTER_W - 4 },
+  nowBar: { flex: 1, height: 2 },
+
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    zIndex: 40,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  menuBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerDate: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    height: 40,
+    borderRadius: 20,
+  },
+  headerDateText: { fontSize: 13, fontWeight: '700' },
 });

@@ -1,0 +1,21 @@
+import { Model } from '@nozbe/watermelondb'
+import { date, field, readonly, text } from '@nozbe/watermelondb/decorators'
+
+export type ActivityType = 'task' | 'event' | 'habit'
+export type ActivityStatus = 'backlog' | 'scheduled' | 'done' | 'skipped'
+export type ActivityPriority = 'low' | 'medium' | 'high'
+
+export default class Activity extends Model {
+  static table = 'activities'
+
+  @text('title') title!: string
+  @text('description') description!: string
+  @text('type') type!: ActivityType
+  @text('status') status!: ActivityStatus
+  @field('start_time') startTime!: number | null
+  @field('duration') duration!: number
+  @text('priority') priority!: ActivityPriority
+
+  @readonly @date('created_at') createdAt!: Date
+  @readonly @date('updated_at') updatedAt!: Date
+}
